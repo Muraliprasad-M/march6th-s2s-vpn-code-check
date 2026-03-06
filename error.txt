@@ -1,4 +1,4 @@
-terraform plan error 1 
+terraform plan error 1
 Starting: Terraform Plan
 ==============================================================================
 Task         : Command line
