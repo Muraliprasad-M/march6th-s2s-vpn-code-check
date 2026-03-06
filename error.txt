@@ -1,0 +1,15 @@
+terraform plan error 1 
+Starting: Terraform Plan
+==============================================================================
+Task         : Command line
+Description  : Run a command line script using Bash on Linux and macOS and cmd.exe on Windows
+Version      : 2.268.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/command-line
+==============================================================================
+Generating script.
+Script contents:
+terraform plan -out=tfplan.out
+========================== Starting Command Output ===========================
+/usr/bin/bash --noprofile --norc /home/vsts/work/_temp/51e57aa0-3c65-4780-9cf7-9c954ccbe635.sh
+var.aws_region
