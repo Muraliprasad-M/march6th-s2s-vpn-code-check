@@ -13,3 +13,17 @@ terraform plan -out=tfplan.out
 ========================== Starting Command Output ===========================
 /usr/bin/bash --noprofile --norc /home/vsts/work/_temp/51e57aa0-3c65-4780-9cf7-9c954ccbe635.sh
 var.aws_region
+
+	1. Create terraform and azure devops pipeline to setup AWS S2S vpn with existing on-prem and AWS TGW.
+	Note : Below configuration already exist.
+	ADO to AWS OIDC
+	Aws --> it-vpc, it-subnets , it-routable, it-TGW,domain it , environment prod
+	Aws --> ot-vpc, ot-subnets , ot-routable, ot-TGW,domain ot , environment prod
+	On-prem already exist.
+	New configurations such as Customer gateway  for it and ot.
+	Requirement : 
+	terraform version 1.14.5 and aws provider version 6.32.1.
+	Terraform stages such as code valdiation (tflint), plan, approval manual and apply)
+	Publish the artifacts.
+	
+	
