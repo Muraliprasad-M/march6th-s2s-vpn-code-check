@@ -1,0 +1,113 @@
+trigger:
+  branches:
+    include:
+      - "*"
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: pipeline-templates
+      ref: refs/tags/v1.1.1
+
+parameters:
+  - name: environment
+    displayName: "Select environment"
+    type: string
+    default: "ot"
+    values:
+      - ot
+      - it
+
+pool:
+  vmImage: ubuntu-latest
+
+# =====================================================
+# VALIDATE
+# =====================================================
+stages:
+- stage: Validate
+  displayName: "Code Validation"
+  jobs:
+    - job: CodeValidation
+      steps:
+        - template: stages/code-validation-stage.yml@templates
+
+
+# =====================================================
+# PLAN
+# =====================================================
+- stage: Plan
+  displayName: "Terraform Plan"
+  dependsOn: Validate
+  condition: succeeded()
+  jobs:
+    - job: TerraformPlan
+      displayName: "Plan"
+      steps:
+
+        # Select correct tfvars file
+        - bash: |
+            if [ "${{ parameters.environment }}" = "ot" ]; then
+              echo "TFVARS=ot-prod.tfvars" >> $BASH_ENV
+            else
+              echo "TFVARS=it-prod.tfvars" >> $BASH_ENV
+            fi
+
+        - template: stages/terraform-plan-stage.yml@templates
+          parameters:
+            awsServiceConnection: "aws-core-network"
+            roleArn: "arn:aws:iam::732822664028:role/TerraformExecutionRole"
+
+            tfStateBucket: "st-network-prod-euw2-tfstate-eyqwgt"
+            tfStateLock:   "st-network-prod-euw2-tfstate-lock"
+
+            # Correct ADO expression
+            tfStateKey: $[eq(parameters.environment, 'ot') ?
+                          'core-network/ot/tgw-vpn.tfstate' :
+                          'core-network/it/tgw-vpn.tfstate']
+
+            tfVarsFile: $(TFVARS)
+            workingDirectory: "."
+
+
+# =====================================================
+# APPLY (Manual)
+# =====================================================
+- stage: Apply
+  displayName: "Terraform Apply"
+  dependsOn: Plan
+  condition: succeeded()
+  jobs:
+    - deployment: ApplyDeployment
+      displayName: "Apply"
+      environment: "ManualApply"   # Manual approval required
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+
+              - checkout: self
+
+              # Select correct tfvars file
+              - bash: |
+                  if [ "${{ parameters.environment }}" = "ot" ]; then
+                    echo "TFVARS=ot-prod.tfvars" >> $BASH_ENV
+                  else
+                    echo "TFVARS=it-prod.tfvars" >> $BASH_ENV
+                  fi
+
+              - template: stages/terraform-apply-stage.yml@templates
+                parameters:
+                  awsServiceConnection: "aws-core-network"
+                  roleArn: "arn:aws:iam::732822664028:role/TerraformExecutionRole"
+
+                  tfStateBucket: "st-network-prod-euw2-tfstate-eyqwgt"
+                  tfStateLock:   "st-network-prod-euw2-tfstate-lock"
+
+                  tfStateKey: $[eq(parameters.environment, 'ot') ?
+                                'core-network/ot/tgw-vpn.tfstate' :
+                                'core-network/it/tgw-vpn.tfstate']
+
+                  tfVarsFile: $(TFVARS)
+                  workingDirectory: "."
