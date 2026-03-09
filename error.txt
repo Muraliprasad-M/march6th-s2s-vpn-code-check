@@ -25,5 +25,177 @@ var.aws_region
 	terraform version 1.14.5 and aws provider version 6.32.1.
 	Terraform stages such as code valdiation (tflint), plan, approval manual and apply)
 	Publish the artifacts.
-	
+	--------------------------------
+main
+############################################
+# Customer Gateway
+############################################
+resource "aws_customer_gateway" "cgw" {
+  for_each = local.vpn_connections
+
+  bgp_asn    = var.cgw_bgp_asn
+  ip_address = each.value.ip
+  type       = "ipsec.1"
+
+  tags = merge(
+    var.tags,
+    {
+      # Dynamically uses st or ot based on var.domain and appends the key (vpn-0, vpn-1)
+      Name = format("%s-network-ss-vpn-azgw1-%s", var.domain, each.key)
+    }
+  )
+}
+
+############################################
+# VPN Connection
+############################################
+resource "aws_vpn_connection" "vpn" {
+  for_each = aws_customer_gateway.cgw
+
+  customer_gateway_id = each.value.id
+  transit_gateway_id  = var.tgw_id
+  type                = "ipsec.1"
+  static_routes_only  = false # Enables BGP as per your plan
+
+  tags = merge(
+    var.tags,
+    {
+      # Dynamically uses st or ot based on var.domain and appends the key (vpn-0, vpn-1)
+      Name = format("%s-network-ss-vpn-azure-%s", var.domain, each.key)
+    }
+  )
+}
+
+############################################
+# TGW Associations & Propagations
+############################################
+
+resource "aws_ec2_transit_gateway_route_table_association" "vpn_assoc" {
+  for_each = aws_vpn_connection.vpn
+
+  transit_gateway_attachment_id  = each.value.transit_gateway_attachment_id
+  transit_gateway_route_table_id = var.tgw_rtb_id
+  replace_existing_association   = "true"
+}
+
+resource "aws_ec2_transit_gateway_route_table_propagation" "vpn_prop" {
+  for_each = aws_vpn_connection.vpn
+
+  transit_gateway_attachment_id  = each.value.transit_gateway_attachment_id
+  transit_gateway_route_table_id = var.tgw_rtb_id
+
+}
+resource "aws_ec2_transit_gateway" "main" {
+  default_route_table_association = "disable"
+  default_route_table_propagation = "disable"
+}
+# ############################################
+# # Customer Gateway
+# ############################################
+# resource "aws_customer_gateway" "cgw" {
+
+#   for_each = local.vpn_connections
+
+#   bgp_asn    = var.cgw_bgp_asn
+#   ip_address = each.value.ip
+#   type       = "ipsec.1"
+
+#   tags = merge(
+#     var.tags,
+#     {
+
+#       Name = var.domain == "st" ? "st-network-prod-euw2-cgw" : "st-network-prod-euw2-cgw${each.key == "vpn-0" ? "1" : "2"}"
+#     }
+#   )
+# }
+
+# ############################################
+# # VPN Connection
+# ############################################
+
+# resource "aws_vpn_connection" "vpn" {
+
+#   for_each = aws_customer_gateway.cgw
+
+#   customer_gateway_id = each.value.id
+#   transit_gateway_id  = var.tgw_id
+#   type                = "ipsec.1"
+
+#   static_routes_only = false
+
+#   tags = merge(
+#     var.tags,
+#     {
+#       Name = var.domain == "st" ? "st-network-prod-euw2-vpn" : "st-network-prod-euw2-vpn${each.key == "vpn-0" ? "1" : "2"}"
+#     }
+#   )
+# }
+
+# resource "aws_ec2_transit_gateway_route_table_association" "vpn_assoc" {
+
+#   for_each = aws_vpn_connection.vpn
+
+#   transit_gateway_attachment_id  = each.value.transit_gateway_attachment_id
+#   transit_gateway_route_table_id = var.tgw_rtb_id
+# }
+
+# resource "aws_ec2_transit_gateway_route_table_propagation" "vpn_prop" {
+
+#   for_each = aws_vpn_connection.vpn
+
+#   transit_gateway_attachment_id  = each.value.transit_gateway_attachment_id
+#   transit_gateway_route_table_id = var.tgw_rtb_id
+# }
+
+terraform.tfvars
+aws_region = "eu-west-2"
+env        = "prod"
+domain     = "ot"
+
+tgw_id     = "tgw-046432679404c0c8e"
+tgw_rtb_id = "tgw-rtb-00ca28a14ca8a206d"
+
+vpc_id = "vpc-08d937b89707ea8ac"
+
+tgw_subnet_ids = [
+  "subnet-0ba3462654aaafb54",
+  "subnet-0fd76b1d3f1bc7523",
+  "subnet-072adb60a59888568"
+]
+
+cgw_public_ips = [
+  "4.159.61.37",
+  "40.127.209.247"
+]
+
+cgw_bgp_asn = 2009
+
+tags = {
+  project = "corenetwork"
+  domain  = "ot"
+}
+
+variables
+variable "aws_region" {}
+variable "env" {}
+variable "domain" {}
+
+variable "tgw_id" {}
+variable "tgw_rtb_id" {}
+variable "vpc_id" {}
+
+variable "tgw_subnet_ids" {
+  type = list(string)
+}
+
+variable "cgw_public_ips" {
+  type = list(string)
+}
+
+variable "cgw_bgp_asn" {}
+
+variable "tags" {
+  type = map(string)
+}
+
 	
